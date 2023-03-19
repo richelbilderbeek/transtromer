@@ -4,7 +4,14 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <boost/algorithm/string.hpp>
+
+bool file_exists(const std::string& name)
+{
+  std::ifstream f(name.c_str());
+  return f.good();
+}
 
 std::vector<std::string> load_text(
   const std::string& filename
@@ -59,8 +66,23 @@ std::string strs_to_cs_str(const std::set<std::string>& v)
   return t;
 
 }
+std::string strip_link_xml(const std::string& s)
+{
+  assert(s.substr(0, 11) == "<li><a href");
+  assert(s.substr(s.length() - 9, 9) == "</a></li>");
+  const std::regex link_regex(
+    "<li><a href=\".*\">(.*)</a></li>"
+  );
+  std::smatch match;
+  const bool does_match{std::regex_match(s, match, link_regex)};
+  assert(does_match);
+  assert(match.size() == 2);
+  const std::ssub_match sub_match = match[1];
+  const std::string word = sub_match.str();
+  return word;
+}
 
-std::string strip_xml(const std::string& s)
+std::string strip_list_item_xml(const std::string& s)
 {
   assert(s.substr(0, 4) == "<li>");
   assert(s.substr(s.length() - 5, 5) == "</li>");
@@ -82,16 +104,6 @@ std::ostream& text_to_stream(std::ostream& os, const std::vector<std::string>& w
       if (s == "</>") s = "<\b/>";
     }
   );
-  //Check data
-  #ifndef NDEBUG
-  std::for_each(v.begin(),v.end(),
-    [&os](const std::string& s)
-    {
-      assert(s != "</>" && "Text shoule not be '</>' anymore");
-      assert(std::count(s.begin(),s.end(),' ') == 0 && "Text should not contain spaces anymore");
-    }
-  );
-  #endif
   //Write data
   std::for_each(v.begin(),v.end(),
     [&os](const std::string& s)
@@ -147,6 +159,14 @@ void test_text()
     save_text(v, filename);
     const auto text{load_text(filename)};
     assert(text == v);
+  }
+  // strip_link_xml
+  {
+    const auto created{
+      strip_link_xml("<li><a href=\"/ord/A5\">A5</a></li>")
+    };
+    const std::string expected{"A5"};
+    assert(created == expected);
   }
   //Read from file
   {

@@ -7,6 +7,10 @@
 #include <string>
 #include <vector>
 
+/// Check if a file exists
+// From https://stackoverflow.com/a/12774387
+bool file_exists(const std::string& name);
+
 std::vector<std::string> load_text(
   const std::string& filename
 );
@@ -29,9 +33,16 @@ std::istream& stream_to_text(std::istream& is, std::vector<std::string>& v);
 // From https://stackoverflow.com/a/55263720
 std::vector<std::string> string_to_text(const std::string& s);
 
+/// Removes the XML tags '<li><a href=...>'
+/// and '</a></li>' at the start
+/// and end of the string
+/// @example
+/// // <li><a href="/ord/A5">A5</a></li>
+std::string strip_link_xml(const std::string& s);
+
 /// Removes the XML tags '<li>' and '</li>' at the start
 /// and end of the string
-std::string strip_xml(const std::string& s);
+std::string strip_list_item_xml(const std::string& s);
 
 /// Convert strings to one comma-seperated string
 std::string strs_to_cs_str(const std::set<std::string>& v);

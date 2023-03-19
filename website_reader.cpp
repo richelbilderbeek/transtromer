@@ -5,7 +5,7 @@
 #include <QEventLoop>
 #include <QObject>
 
-
+#include <iostream>
 #include <fstream>
 #include <regex>
 #include <sstream>
@@ -29,7 +29,7 @@ std::set<std::string> website_reader::get_rhyme_words(const std::string& word)
     return m_rhyme_words[word];
   }
 
-  const auto text{get_url_content_as_text(word)};
+  const auto text{get_html_content_from_word_as_text(word)};
 
   std::set<std::string> rhyme_words;
   for (const std::string& s: text)
@@ -38,14 +38,14 @@ std::set<std::string> website_reader::get_rhyme_words(const std::string& word)
     std::regex e("<li>.*</li>");
     if (std::regex_match(t, e))
     {
-      rhyme_words.insert(strip_xml(t));
+      rhyme_words.insert(strip_list_item_xml(t));
     }
   }
   m_rhyme_words[word] = rhyme_words;
   return rhyme_words;
 }
 
-std::string website_reader::get_url_content_as_string(const std::string& word)
+std::string website_reader::get_html_content_from_word_as_string(const std::string& word)
 {
   QEventLoop loop;
   QNetworkAccessManager nam;
@@ -59,9 +59,32 @@ std::string website_reader::get_url_content_as_string(const std::string& word)
   return s;
 }
 
-std::vector<std::string> website_reader::get_url_content_as_text(const std::string& word)
+std::vector<std::string> website_reader::get_html_content_from_word_as_text(const std::string& word)
 {
-  return string_to_text(get_url_content_as_string(word));
+  return string_to_text(get_html_content_from_word_as_string(word));
+}
+
+std::string read_html_content_from_wordlist_as_string(const int page_number)
+{
+  QEventLoop loop;
+  QNetworkAccessManager nam;
+  QNetworkRequest req(
+    QUrl(
+      "https://www.rimlexikon.se/katalog/?page="
+        + QString::number(page_number)
+    )
+  );
+  QNetworkReply *reply = nam.get(req);
+  QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+  loop.exec();
+  const QByteArray buffer = reply->readAll();
+  const std::string s{QString(buffer).toStdString()};
+  return s;
+}
+
+std::vector<std::string> read_html_content_from_wordlist_as_text(const int page_number)
+{
+  return string_to_text(read_html_content_from_wordlist_as_string(page_number));
 }
 
 website_reader load_website_reader(const std::string& filename)
@@ -83,6 +106,43 @@ website_reader load_website_reader(const std::string& filename)
 }
 
 
+void read_and_save_all_words(const std::string& filename)
+{
+  std::vector<std::string> all_words;
+  for (int page_number{1}; page_number != 709; ++page_number)
+  {
+    std::clog << page_number << "/" << 708 << '\n';
+    const auto words{read_word_list(page_number)};
+    std::copy(
+      std::begin(words),
+      std::end(words),
+      std::back_inserter(all_words)
+    );
+  }
+  save_text(all_words, filename);
+}
+
+/// Read the word list from the website
+/// @param page_number value from [1, 708]
+/// @see use get_url_text to get the full page's content
+std::vector<std::string> read_word_list(const int page_number)
+{
+  const auto html_text{
+    read_html_content_from_wordlist_as_text(page_number)
+  };
+  std::vector<std::string> words;
+  for (const std::string& s: html_text)
+  {
+    const std::string t{boost::trim_copy(s)};
+    std::regex e("<li>.*</li>");
+    if (std::regex_match(t, e))
+    {
+      words.push_back(strip_link_xml(t));
+    }
+  }
+  return words;
+}
+
 void save(const website_reader& w, const std::string& filename)
 {
   std::ofstream f(filename);
@@ -102,15 +162,25 @@ void test_website_reader()
     const website_reader r;
     assert(r.get_n_reads() == 0);
   }
-  // get_url_text_as_string must return something
+  // get_html_content_from_word_as_string must return something
   {
     website_reader r;
-    const std::string s{r.get_url_content_as_string("bol")};
+    const std::string s{r.get_html_content_from_word_as_string("bol")};
     assert(!s.empty());
   }
-  // get_url_text_as_text must return something
+  // get_html_content_from_word_as_text must return something
   {
-    assert(website_reader().get_url_content_as_text("bol").size() > 10);
+    assert(website_reader().get_html_content_from_word_as_text("bol").size() > 10);
+  }
+  // get_html_content_from_wordlist_as_string must return something
+  {
+    const std::string s{read_html_content_from_wordlist_as_string(1)};
+    assert(!s.empty());
+  }
+  // get_html_content_from_wordlist_as_text must return something
+  {
+    const auto text{read_html_content_from_wordlist_as_text(1)};
+    assert(text.size() > 10);
   }
   {
     assert(string_to_text("a").size() == 1);
@@ -133,7 +203,7 @@ void test_website_reader()
   }
   // strip_xml
   {
-    assert(strip_xml("<li>something</li>") == "something");
+    assert(strip_list_item_xml("<li>something</li>") == "something");
   }
   // operator==
   {
