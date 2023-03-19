@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -10,10 +10,12 @@ CONFIG += c++11
 
 SOURCES += \
     editwindow.cpp \
-    main.cpp
+    main.cpp \
+    website_reader.cpp
 
 HEADERS += \
-  editwindow.h
+  editwindow.h \
+  website_reader.h
 
 FORMS += \
   editwindow.ui
