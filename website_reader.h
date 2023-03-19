@@ -1,17 +1,30 @@
 #ifndef WEBSITE_READER_H
 #define WEBSITE_READER_H
 
+#include <map>
 #include <string>
 #include <vector>
 
+/// Reads the rhyme words from the website
+/// Will cache earlier results
 class website_reader
 {
 public:
   website_reader();
 
+  int get_n_reads() const noexcept { return m_n_reads; }
+
   /// Get the full website text for a word
   /// @see use get_url_text to get the full page's content
   std::vector<std::string> get_rhyme_words(const std::string& word);
+
+private:
+
+  /// Number of time the website has been read
+  int m_n_reads;
+
+  /// The cached rhyme words
+  std::map<std::string, std::vector<std::string>> m_rhyme_words;
 
   /// Get the full website text for a word as a string
   /// @see use get_rhyme_words to get the rhyming words
@@ -20,6 +33,8 @@ public:
   /// Get the full website text for a word as a text
   /// @see use get_rhyme_words to get the rhyming words
   std::vector<std::string> get_url_content_as_text(const std::string& word);
+
+  friend void test_website_reader();
 };
 
 /// Convert a string to a text, split on a newline

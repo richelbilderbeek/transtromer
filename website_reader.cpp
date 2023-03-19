@@ -11,12 +11,18 @@
 #include <sstream>
 
 website_reader::website_reader()
+  : m_n_reads{0}
 {
 
 }
 
 std::vector<std::string> website_reader::get_rhyme_words(const std::string& word)
 {
+  if (m_rhyme_words.find(word) != std::end(m_rhyme_words))
+  {
+    return m_rhyme_words[word];
+  }
+
   const auto text{get_url_content_as_text(word)};
 
   std::vector<std::string> rhyme_words;
@@ -29,6 +35,7 @@ std::vector<std::string> website_reader::get_rhyme_words(const std::string& word
       rhyme_words.push_back(strip_xml(t));
     }
   }
+  m_rhyme_words[word] = rhyme_words;
   return rhyme_words;
 }
 
@@ -40,8 +47,10 @@ std::string website_reader::get_url_content_as_string(const std::string& word)
   QNetworkReply *reply = nam.get(req);
   QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
   loop.exec();
-  QByteArray buffer = reply->readAll();
-  return QString(buffer).toStdString();
+  const QByteArray buffer = reply->readAll();
+  const std::string s{QString(buffer).toStdString()};
+  ++m_n_reads;
+  return s;
 }
 
 std::vector<std::string> website_reader::get_url_content_as_text(const std::string& word)
@@ -71,10 +80,15 @@ std::string strip_xml(const std::string& s)
 
 void test_website_reader()
 {
-  //
+  {
+    const website_reader r;
+    assert(r.get_n_reads() == 0);
+  }
   // get_url_text_as_string must return something
   {
-    assert(!website_reader().get_url_content_as_string("bol").empty());
+    website_reader r;
+    const std::string s{r.get_url_content_as_string("bol")};
+    assert(!s.empty());
   }
   // get_url_text_as_text must return something
   {
@@ -87,6 +101,17 @@ void test_website_reader()
   // get_rhyme_words must return something
   {
     assert(website_reader().get_rhyme_words("bol").size() > 10);
+  }
+  // reading is cached for get_rhyme_words
+  {
+    website_reader r;
+    assert(r.get_n_reads() == 0);
+    const auto v{r.get_rhyme_words("bol")};
+    assert(!v.empty());
+    assert(r.get_n_reads() == 1);
+    const auto w{r.get_rhyme_words("bol")};
+    assert(v == w);
+    assert(r.get_n_reads() == 1);
   }
   // strip_xml
   {
