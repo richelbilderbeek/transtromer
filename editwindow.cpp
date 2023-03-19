@@ -8,7 +8,9 @@
 
 EditWindow::EditWindow(QWidget *parent) :
   QMainWindow(parent),
-  ui(new Ui::EditWindow)
+  ui(new Ui::EditWindow),
+  m_reader{load_website_reader("transtromer.txt")}
+
 {
   ui->setupUi(this);
   this->setMouseTracking(true);
@@ -25,6 +27,7 @@ EditWindow::EditWindow(QWidget *parent) :
 
 EditWindow::~EditWindow()
 {
+  save(m_reader, "transtromer.txt");
   delete ui;
 }
 
@@ -35,12 +38,12 @@ void EditWindow::on_mouse_move_over_text()
   QTextCursor cursor = ui->text_edit->textCursor();
   cursor.select(QTextCursor::WordUnderCursor);
 
-  website_reader r;
   const auto v{
-    r.get_rhyme_words(cursor.selectedText().toStdString())
+    m_reader.get_rhyme_words(cursor.selectedText().toStdString())
   };
   QString qs;
   for (const auto& s: v) qs += QString::fromStdString(s) + '\n';
 
   ui->rhyme_edit->setPlainText(qs);
+  save(m_reader, "transtromer.txt");
 }

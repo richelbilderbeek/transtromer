@@ -2,6 +2,7 @@
 #define EDITWINDOW_H
 
 #include <QMainWindow>
+#include "website_reader.h"
 
 namespace Ui {
   class EditWindow;
@@ -17,9 +18,11 @@ public:
 
 private:
   Ui::EditWindow *ui;
+  website_reader m_reader;
 
 public slots:
   void on_mouse_move_over_text();
+
 
 };
 

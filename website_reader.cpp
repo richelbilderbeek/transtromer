@@ -5,18 +5,24 @@
 #include <QEventLoop>
 #include <QObject>
 
-#include <boost/algorithm/string.hpp>
 
+#include <fstream>
 #include <regex>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 
-website_reader::website_reader()
-  : m_n_reads{0}
+#include "text.h"
+
+website_reader::website_reader(
+  const std::map<std::string, std::set<std::string>>& known_rhyme_words
+)
+  : m_n_reads{0},
+    m_rhyme_words{known_rhyme_words}
 {
 
 }
 
-std::vector<std::string> website_reader::get_rhyme_words(const std::string& word)
+std::set<std::string> website_reader::get_rhyme_words(const std::string& word)
 {
   if (m_rhyme_words.find(word) != std::end(m_rhyme_words))
   {
@@ -25,14 +31,14 @@ std::vector<std::string> website_reader::get_rhyme_words(const std::string& word
 
   const auto text{get_url_content_as_text(word)};
 
-  std::vector<std::string> rhyme_words;
+  std::set<std::string> rhyme_words;
   for (const std::string& s: text)
   {
     const std::string t{boost::trim_copy(s)};
     std::regex e("<li>.*</li>");
     if (std::regex_match(t, e))
     {
-      rhyme_words.push_back(strip_xml(t));
+      rhyme_words.insert(strip_xml(t));
     }
   }
   m_rhyme_words[word] = rhyme_words;
@@ -58,25 +64,37 @@ std::vector<std::string> website_reader::get_url_content_as_text(const std::stri
   return string_to_text(get_url_content_as_string(word));
 }
 
-// From https://stackoverflow.com/a/55263720
-std::vector<std::string> string_to_text(const std::string& s)
+website_reader load_website_reader(const std::string& filename)
 {
-  std::string tmp;
-  std::stringstream ss(s);
-  std::vector<std::string> words;
-
-  while(std::getline(ss, tmp, '\n')){
-      words.push_back(tmp);
+  std::map<std::string, std::set<std::string>> m;
+  const auto text{load_text(filename)};
+  for (const auto& s: text)
+  {
+    auto all_words{seperate_string(s, ',')};
+    const auto key{all_words[0]};
+    all_words.erase(all_words.begin());
+    std::set<std::string> rhyme_words(
+      std::begin(all_words),
+      std::end(all_words)
+    );
+    m[key] = rhyme_words;
   }
-  return words;
+  return m;
 }
 
-std::string strip_xml(const std::string& s)
+
+void save(const website_reader& w, const std::string& filename)
 {
-  assert(s.substr(0, 4) == "<li>");
-  assert(s.substr(s.length() - 5, 5) == "</li>");
-  return s.substr(4, s.length() - 4 - 5);
+  std::ofstream f(filename);
+  const auto& m{w.get_known_rhyme_words()};
+  for (const auto& [key, value]: m)
+  {
+    f << key << ',' << strs_to_cs_str(value) << '\n';
+  }
+
 }
+
+
 
 void test_website_reader()
 {
@@ -117,4 +135,42 @@ void test_website_reader()
   {
     assert(strip_xml("<li>something</li>") == "something");
   }
+  // operator==
+  {
+    const website_reader r;
+    const website_reader s;
+    assert(r == s);
+    assert(!(r != s));
+  }
+  // operator!=
+  {
+    const website_reader r;
+    std::map<std::string, std::set<std::string>> m;
+    m["bol"] = { "hol", "fjol" };
+    const website_reader s(m);
+    assert(r != s);
+    assert(!(r == s));
+  }
+  // save and load result in identical website_readers
+  {
+    const std::string filename{"tmp_test.txt"};
+    std::map<std::string, std::set<std::string>> m;
+    m["bol"] = { "hol", "fjol" };
+    const website_reader r(m);
+    save(r, filename);
+    const website_reader s{load_website_reader(filename)};
+    assert(r == s);
+  }
+}
+
+bool operator==(const website_reader& lhs, const website_reader& rhs) noexcept
+{
+  return lhs.get_known_rhyme_words() == rhs.get_known_rhyme_words()
+    && lhs.get_n_reads() == rhs.get_n_reads()
+  ;
+}
+
+bool operator!=(const website_reader& lhs, const website_reader& rhs) noexcept
+{
+  return !(lhs == rhs);
 }
